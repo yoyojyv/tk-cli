@@ -1,0 +1,22 @@
+{
+  "name": "tk-cli",
+  "version": "0.1.0",
+  "description": "Personal ticket management CLI",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "tk": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "build": "bun build src/index.ts --compile --outfile dist/tk",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
