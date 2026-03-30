@@ -65,7 +65,7 @@ function issueCreate(args: string[]): void {
   // 다음 티켓 번호 생성
   const row = db.query("SELECT COUNT(*) as cnt FROM tickets WHERE project = ?").get(project.name) as { cnt: number };
   const num = String(row.cnt + 1).padStart(3, "0");
-  const id = `${project.prefix}-${num}`;
+  const id = `${project.key}-${num}`;
 
   db.query(`
     INSERT INTO tickets (id, project, title, priority, tags)
@@ -258,7 +258,7 @@ interface TicketRow {
 
 interface ProjectRow {
   name: string;
-  prefix: string;
+  key: string;
   path: string;
   created_at: string;
 }

@@ -10,7 +10,7 @@ const MIGRATIONS: Record<number, string[]> = {
     )`,
     `CREATE TABLE IF NOT EXISTS projects (
       name TEXT PRIMARY KEY,
-      prefix TEXT NOT NULL UNIQUE,
+      key TEXT NOT NULL UNIQUE,
       path TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,

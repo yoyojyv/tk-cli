@@ -44,18 +44,18 @@ function projectInit(args: string[]): void {
     name = path.split("/").pop() || "unknown";
   }
 
-  const prefix = String(flags.prefix || name.toUpperCase().replace(/[^A-Z0-9]/g, "").substring(0, 6) || "TK");
+  const key = String(flags.key || name.toUpperCase().replace(/[^A-Z0-9]/g, "").substring(0, 6) || "TK");
 
   // 이미 등록된 프로젝트인지 확인
   const existing = db.query("SELECT * FROM projects WHERE path = ?").get(path);
   if (existing) {
-    console.log(`Project already registered: ${name} (${prefix})`);
+    console.log(`Project already registered: ${name} (${key})`);
     return;
   }
 
-  db.query("INSERT INTO projects (name, prefix, path) VALUES (?, ?, ?)").run(name, prefix, path);
+  db.query("INSERT INTO projects (name, key, path) VALUES (?, ?, ?)").run(name, key, path);
   console.log(`Project initialized: ${name}`);
-  console.log(`  Prefix: ${prefix}`);
+  console.log(`  Key:    ${key}`);
   console.log(`  Path:   ${path}`);
   console.log(`\nCreate your first ticket: tk issue create "My first task"`);
 }
@@ -64,7 +64,7 @@ function projectList(args: string[]): void {
   const db = initDb();
   const projects = db.query("SELECT * FROM projects ORDER BY name").all() as Array<{
     name: string;
-    prefix: string;
+    key: string;
     path: string;
     created_at: string;
   }>;
@@ -83,7 +83,7 @@ function projectList(args: string[]): void {
     `).all(p.name) as Array<{ status: string; cnt: number }>;
 
     const summary = stats.map(s => `${s.cnt} ${s.status}`).join(", ") || "no tickets";
-    console.log(`  ${p.name.padEnd(25)} ${p.prefix.padEnd(8)} ${summary}`);
+    console.log(`  ${p.name.padEnd(25)} ${p.key.padEnd(8)} ${summary}`);
   }
   console.log();
 }
@@ -100,7 +100,7 @@ function projectView(args: string[]): void {
 
   const project = db.query("SELECT * FROM projects WHERE path = ?").get(path) as {
     name: string;
-    prefix: string;
+    key: string;
     path: string;
     created_at: string;
   } | null;
@@ -120,7 +120,7 @@ function projectView(args: string[]): void {
 
   console.log(`
   Project: ${project.name}
-  Prefix:  ${project.prefix}
+  Prefix:  ${project.key}
   Path:    ${project.path}
   Created: ${project.created_at}
   Tickets: ${total}
