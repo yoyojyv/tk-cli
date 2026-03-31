@@ -1,36 +1,58 @@
-import { initDb } from "../db/schema";
+import type { Database } from "bun:sqlite";
 import type { ProjectRow } from "../db/types";
 import { parseArgs } from "../utils/parser";
 import { detectProjectPath } from "../utils/project";
 
-export function projectCommand(args: string[]): void {
+const SUBCOMMAND_ALIASES: Record<string, string> = {
+  l: "list",
+  v: "view",
+};
+
+export function projectCommand(args: string[], db: Database): void {
   if (args.length === 0) {
-    console.error("Usage: tk project <init|list|view> [options]");
+    showProjectHelp();
     process.exit(1);
   }
 
-  const subcommand = args[0] === "l" ? "list" : args[0] === "v" ? "view" : args[0]!;
+  const subcommand = SUBCOMMAND_ALIASES[args[0]!] || args[0]!;
   const rest = args.slice(1);
 
   switch (subcommand) {
     case "init":
-      projectInit(rest);
+      projectInit(rest, db);
       break;
     case "list":
-      projectList(rest);
+      projectList(db);
       break;
     case "view":
-      projectView(rest);
+      projectView(db);
+      break;
+    case "--help":
+    case "-h":
+      showProjectHelp();
       break;
     default:
-      console.error(`Unknown subcommand: ${args[0]}`);
+      console.error(`Error: Unknown subcommand: ${args[0]}`);
       process.exit(1);
   }
 }
 
-function projectInit(args: string[]): void {
+function showProjectHelp(): void {
+  console.log(`
+Usage: tk project <subcommand> [options]
+
+Subcommands:
+  init  Initialize current directory as a project
+  list  (l)  List all projects
+  view  (v)  View current project details
+
+Options (init):
+  --key  Custom project key (default: auto-generated from directory name)
+`);
+}
+
+function projectInit(args: string[], db: Database): void {
   const { flags } = parseArgs(args);
-  const db = initDb();
 
   const path = detectProjectPath();
   const name = path.split("/").pop() || "unknown";
@@ -50,6 +72,14 @@ function projectInit(args: string[]): void {
     return;
   }
 
+  // key 충돌 확인
+  const keyConflict = db.query("SELECT name FROM projects WHERE key = ?").get(key) as { name: string } | null;
+  if (keyConflict) {
+    console.error(`Error: Key "${key}" is already used by project "${keyConflict.name}".`);
+    console.error("Use --key <OTHER_KEY> to specify a different key.");
+    process.exit(1);
+  }
+
   db.query("INSERT INTO projects (name, key, path) VALUES (?, ?, ?)").run(name, key, path);
   console.log(`Project initialized: ${name}`);
   console.log(`  Key:    ${key}`);
@@ -57,8 +87,7 @@ function projectInit(args: string[]): void {
   console.log(`\nCreate your first ticket: tk issue create "My first task"`);
 }
 
-function projectList(_args: string[]): void {
-  const db = initDb();
+function projectList(db: Database): void {
   const projects = db.query("SELECT * FROM projects ORDER BY name").all() as ProjectRow[];
 
   if (projects.length === 0) {
@@ -82,13 +111,12 @@ function projectList(_args: string[]): void {
   console.log();
 }
 
-function projectView(_args: string[]): void {
-  const db = initDb();
+function projectView(db: Database): void {
   const path = detectProjectPath();
   const project = db.query("SELECT * FROM projects WHERE path = ?").get(path) as ProjectRow | null;
 
   if (!project) {
-    console.error('Not a registered project. Run "tk project init" first.');
+    console.error('Error: Not a registered project. Run "tk project init" first.');
     process.exit(1);
   }
 
@@ -104,7 +132,7 @@ function projectView(_args: string[]): void {
 
   console.log(`
   Project: ${project.name}
-  Prefix:  ${project.key}
+  Key:     ${project.key}
   Path:    ${project.path}
   Created: ${project.created_at}
   Tickets: ${total}

@@ -3,6 +3,8 @@
 import { boardCommand } from "./commands/board";
 import { issueCommand } from "./commands/issue";
 import { projectCommand } from "./commands/project";
+import { initDb } from "./db/schema";
+import pkg from "../package.json";
 
 const ALIASES: Record<string, string> = {
   i: "issue",
@@ -25,6 +27,11 @@ Options:
   --help, -h    Show help
   --version     Show version
 
+Board Options:
+  --all           Show all projects
+  --status <s>    Filter by status
+  --tag, -t <tag> Filter by tag
+
 Examples:
   tk issue create "Add search autocomplete"
   tk issue list --status running
@@ -44,27 +51,32 @@ function main(): void {
   }
 
   if (args[0] === "--version") {
-    console.log("tk v0.1.0");
+    console.log(`tk v${pkg.version}`);
     process.exit(0);
   }
 
   const command = ALIASES[args[0]!] || args[0]!;
   const rest = args.slice(1);
 
-  switch (command) {
-    case "issue":
-      issueCommand(rest);
-      break;
-    case "project":
-      projectCommand(rest);
-      break;
-    case "board":
-      boardCommand(rest);
-      break;
-    default:
-      console.error(`Unknown command: ${args[0]}`);
-      console.error('Run "tk --help" for usage.');
-      process.exit(1);
+  const db = initDb();
+  try {
+    switch (command) {
+      case "issue":
+        issueCommand(rest, db);
+        break;
+      case "project":
+        projectCommand(rest, db);
+        break;
+      case "board":
+        boardCommand(rest, db);
+        break;
+      default:
+        console.error(`Error: Unknown command: ${args[0]}`);
+        console.error('Run "tk --help" for usage.');
+        process.exit(1);
+    }
+  } finally {
+    db.close();
   }
 }
 

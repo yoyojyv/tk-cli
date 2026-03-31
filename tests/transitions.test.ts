@@ -4,23 +4,12 @@ import { unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { migrate } from "../src/db/schema";
+import { VALID_TRANSITIONS } from "../src/db/types";
 
 /**
  * 상태 전이 로직 테스트.
  * VALID_TRANSITIONS 맵에 정의된 규칙을 DB 레벨에서 검증한다.
- *
- * 상태 전이 규칙:
- *   backlog → running, aborted
- *   running → paused, done
- *   paused  → running, aborted
- *   done, aborted = terminal (전이 불가)
  */
-
-const VALID_TRANSITIONS: Record<string, string[]> = {
-  backlog: ["running", "aborted"],
-  running: ["paused", "done"],
-  paused: ["running", "aborted"],
-};
 
 const ALL_STATUSES = ["backlog", "running", "paused", "done", "aborted"];
 

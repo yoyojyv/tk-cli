@@ -40,7 +40,7 @@ describe("CLI 기본", () => {
   it("--version을 출력한다", () => {
     const { stdout, exitCode } = run(["--version"]);
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("tk v0.1.0");
+    expect(stdout).toMatch(/tk v\d+\.\d+\.\d+/);
   });
 
   it("없는 명령어에 에러를 반환한다", () => {
@@ -67,7 +67,7 @@ describe("이슈 명령어", () => {
   it("서브커맨드 없이 실행하면 사용법을 안내한다", () => {
     const { stderr, exitCode } = run(["issue"]);
     expect(exitCode).toBe(1);
-    expect(stderr).toContain("Usage:");
+    expect(stderr).toContain("Usage");
   });
 
   it("이슈 목록 조회 (--all)", () => {

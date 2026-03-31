@@ -1,5 +1,5 @@
-import { initDb } from "../db/schema";
-import type { TicketRow } from "../db/types";
+import type { Database } from "bun:sqlite";
+import { VALID_TRANSITIONS, type TicketRow } from "../db/types";
 import { parseArgs } from "../utils/parser";
 import { detectProject } from "../utils/project";
 
@@ -11,7 +11,7 @@ const SUBCOMMAND_ALIASES: Record<string, string> = {
   d: "delete",
 };
 
-export function issueCommand(args: string[]): void {
+export function issueCommand(args: string[], db: Database): void {
   if (args.length === 0) {
     console.error("Usage: tk issue <create|list|view|move|delete> [options]");
     process.exit(1);
@@ -22,27 +22,56 @@ export function issueCommand(args: string[]): void {
 
   switch (subcommand) {
     case "create":
-      issueCreate(rest);
+      issueCreate(rest, db);
       break;
     case "list":
-      issueList(rest);
+      issueList(rest, db);
       break;
     case "view":
-      issueView(rest);
+      issueView(rest, db);
       break;
     case "move":
-      issueMove(rest);
+      issueMove(rest, db);
       break;
     case "delete":
-      issueDelete(rest);
+      issueDelete(rest, db);
+      break;
+    case "--help":
+    case "-h":
+      showIssueHelp();
       break;
     default:
-      console.error(`Unknown subcommand: ${args[0]}`);
+      console.error(`Error: Unknown subcommand: ${args[0]}`);
       process.exit(1);
   }
 }
 
-function issueCreate(args: string[]): void {
+function showIssueHelp(): void {
+  console.log(`
+Usage: tk issue <subcommand> [options]
+
+Subcommands:
+  create (c)  Create a new ticket
+  list   (l)  List tickets
+  view   (v)  View ticket details
+  move   (m)  Move ticket to a new status
+  delete (d)  Soft-delete a ticket
+
+Options (create):
+  -p, --priority  Priority: 0 (urgent), 1, 2 (default), 3 (low)
+  -t, --tag       Tags: comma-separated or JSON array
+
+Options (list):
+  --status        Filter by status
+  -p, --priority  Filter by priority
+  --project       Filter by project name
+  --tag, -t       Filter by tag
+  --all           Show all projects
+  --json          Output as JSON
+`);
+}
+
+function issueCreate(args: string[], db: Database): void {
   const { positional, flags } = parseArgs(args);
   const title = positional[0];
   if (!title) {
@@ -50,10 +79,9 @@ function issueCreate(args: string[]): void {
     process.exit(1);
   }
 
-  const db = initDb();
   const project = detectProject(db);
   if (!project) {
-    console.error('No project found. Run "tk project init" first.');
+    console.error('Error: No project found. Run "tk project init" first.');
     process.exit(1);
   }
 
@@ -84,26 +112,26 @@ function issueCreate(args: string[]): void {
   const row = db
     .query("SELECT MAX(CAST(SUBSTR(id, LENGTH(?) + 2) AS INTEGER)) as max_num FROM tickets WHERE project = ?")
     .get(project.key, project.name) as { max_num: number | null };
-  const num = String((row.max_num ?? 0) + 1).padStart(3, "0");
+  const num = String((row.max_num ?? 0) + 1).padStart(4, "0");
   const id = `${project.key}-${num}`;
 
-  db.query(`
-    INSERT INTO tickets (id, project, title, priority, tags)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(id, project.name, title, priority, tagsJson);
+  db.transaction(() => {
+    db.query(`
+      INSERT INTO tickets (id, project, title, priority, tags)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, project.name, title, priority, tagsJson);
 
-  // 히스토리 기록
-  db.query(`
-    INSERT INTO ticket_history (ticket_id, event_type, data)
-    VALUES (?, 'created', ?)
-  `).run(id, JSON.stringify({ title, priority }));
+    db.query(`
+      INSERT INTO ticket_history (ticket_id, event_type, data)
+      VALUES (?, 'created', ?)
+    `).run(id, JSON.stringify({ title, priority }));
+  })();
 
   console.log(`Created: ${id} "${title}" (P${priority})`);
 }
 
-function issueList(args: string[]): void {
+function issueList(args: string[], db: Database): void {
   const { flags } = parseArgs(args);
-  const db = initDb();
 
   let sql = "SELECT * FROM tickets WHERE status != 'deleted'";
   const params: string[] = [];
@@ -121,15 +149,16 @@ function issueList(args: string[]): void {
     params.push(String(flags.project));
   } else if (!flags.all) {
     const project = detectProject(db);
-    if (project) {
-      sql += " AND project = ?";
-      params.push(project.name);
+    if (!project) {
+      console.error('Error: Not a registered project. Run "tk project init" first, or use --all.');
+      process.exit(1);
     }
+    sql += " AND project = ?";
+    params.push(project.name);
   }
   if (flags.tag || flags.t) {
-    sql += " AND tags LIKE ? ESCAPE '\\'";
-    const tagVal = String(flags.tag ?? flags.t).replace(/[\\%_]/g, (c) => `\\${c}`);
-    params.push(`%${tagVal}%`);
+    sql += " AND EXISTS (SELECT 1 FROM json_each(tags) WHERE json_each.value = ?)";
+    params.push(String(flags.tag ?? flags.t));
   }
 
   sql += " ORDER BY priority ASC, updated_at DESC";
@@ -156,7 +185,7 @@ function issueList(args: string[]): void {
   console.log();
 }
 
-function issueView(args: string[]): void {
+function issueView(args: string[], db: Database): void {
   const { positional } = parseArgs(args);
   const id = positional[0];
   if (!id) {
@@ -164,10 +193,9 @@ function issueView(args: string[]): void {
     process.exit(1);
   }
 
-  const db = initDb();
   const ticket = db.query("SELECT * FROM tickets WHERE id = ?").get(id) as TicketRow | null;
   if (!ticket) {
-    console.error(`Ticket not found: ${id}`);
+    console.error(`Error: Ticket not found: ${id}`);
     process.exit(1);
   }
 
@@ -185,14 +213,7 @@ function issueView(args: string[]): void {
 `);
 }
 
-const VALID_TRANSITIONS: Record<string, string[]> = {
-  backlog: ["running", "aborted"],
-  running: ["paused", "done"],
-  paused: ["running", "aborted"],
-  // done, aborted = terminal states
-};
-
-function issueMove(args: string[]): void {
+function issueMove(args: string[], db: Database): void {
   const { positional } = parseArgs(args);
   const [id, targetStatus] = positional;
   if (!id || !targetStatus) {
@@ -201,10 +222,9 @@ function issueMove(args: string[]): void {
     process.exit(1);
   }
 
-  const db = initDb();
   const ticket = db.query("SELECT * FROM tickets WHERE id = ?").get(id) as TicketRow | null;
   if (!ticket) {
-    console.error(`Ticket not found: ${id}`);
+    console.error(`Error: Ticket not found: ${id}`);
     process.exit(1);
   }
 
@@ -220,33 +240,41 @@ function issueMove(args: string[]): void {
   }
 
   const now = new Date().toISOString();
-  const updates: Record<string, string> = { status: targetStatus, updated_at: now };
+  const startedAt = targetStatus === "running" && !ticket.started_at ? now : ticket.started_at;
+  const pausedAt = targetStatus === "paused" ? now : ticket.paused_at;
+  const completedAt = targetStatus === "done" || targetStatus === "aborted" ? now : ticket.completed_at;
 
-  if (targetStatus === "running" && !ticket.started_at) updates.started_at = now;
-  if (targetStatus === "paused") updates.paused_at = now;
-  if (targetStatus === "done" || targetStatus === "aborted") updates.completed_at = now;
+  try {
+    db.transaction(() => {
+      const result = db
+        .query(
+          `UPDATE tickets
+           SET status = ?, updated_at = ?, started_at = ?, paused_at = ?, completed_at = ?
+           WHERE id = ? AND status = ?`,
+        )
+        .run(targetStatus, now, startedAt, pausedAt, completedAt, id, ticket.status);
 
-  const setClauses = Object.keys(updates)
-    .map((k) => `${k} = ?`)
-    .join(", ");
-  const result = db
-    .query(`UPDATE tickets SET ${setClauses} WHERE id = ? AND status = ?`)
-    .run(...Object.values(updates), id, ticket.status);
+      if (result.changes === 0) {
+        throw new Error("concurrent_update");
+      }
 
-  if (result.changes === 0) {
-    console.error(`Error: ${id} status changed concurrently. Please retry.`);
-    process.exit(1);
+      db.query(`
+        INSERT INTO ticket_history (ticket_id, event_type, data)
+        VALUES (?, ?, ?)
+      `).run(id, targetStatus, JSON.stringify({ from: ticket.status, to: targetStatus }));
+    })();
+  } catch (e) {
+    if (e instanceof Error && e.message === "concurrent_update") {
+      console.error(`Error: ${id} status changed concurrently. Please retry.`);
+      process.exit(1);
+    }
+    throw e;
   }
-
-  db.query(`
-    INSERT INTO ticket_history (ticket_id, event_type, data)
-    VALUES (?, ?, ?)
-  `).run(id, targetStatus, JSON.stringify({ from: ticket.status, to: targetStatus }));
 
   console.log(`${id}: ${ticket.status} → ${targetStatus}`);
 }
 
-function issueDelete(args: string[]): void {
+function issueDelete(args: string[], db: Database): void {
   const { positional } = parseArgs(args);
   const id = positional[0];
   if (!id) {
@@ -254,10 +282,13 @@ function issueDelete(args: string[]): void {
     process.exit(1);
   }
 
-  const db = initDb();
   const ticket = db.query("SELECT * FROM tickets WHERE id = ?").get(id) as TicketRow | null;
   if (!ticket) {
-    console.error(`Ticket not found: ${id}`);
+    console.error(`Error: Ticket not found: ${id}`);
+    process.exit(1);
+  }
+  if (ticket.status === "deleted") {
+    console.error(`Error: Ticket already deleted: ${id}`);
     process.exit(1);
   }
 

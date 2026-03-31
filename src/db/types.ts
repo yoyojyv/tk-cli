@@ -21,3 +21,11 @@ export interface ProjectRow {
   path: string;
   created_at: string;
 }
+
+export const VALID_TRANSITIONS: Record<string, string[]> = {
+  backlog: ["running", "aborted"],
+  running: ["paused", "done"],
+  paused: ["running", "aborted"],
+  // done, aborted = terminal states
+};
+

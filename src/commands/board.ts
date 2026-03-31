@@ -1,11 +1,16 @@
-import { initDb } from "../db/schema";
+import type { Database } from "bun:sqlite";
 import type { TicketRow } from "../db/types";
 import { parseArgs } from "../utils/parser";
 import { detectProjectPath } from "../utils/project";
 
-export function boardCommand(args: string[]): void {
+export function boardCommand(args: string[], db: Database): void {
   const { flags } = parseArgs(args);
-  const db = initDb();
+
+  if (flags.help || flags.h) {
+    showBoardHelp();
+    return;
+  }
+
   const showAll = Boolean(flags.all);
   const currentProject = showAll ? null : findCurrentProjectName(db);
 
@@ -14,7 +19,7 @@ export function boardCommand(args: string[]): void {
 
   if (!showAll) {
     if (!currentProject) {
-      console.error('Not a registered project. Run "tk project init" first, or use "tk board --all".');
+      console.error('Error: Not a registered project. Run "tk project init" first, or use "tk board --all".');
       process.exit(1);
     }
     sql += " AND project = ?";
@@ -26,9 +31,8 @@ export function boardCommand(args: string[]): void {
     params.push(String(flags.status));
   }
   if (flags.tag || flags.t) {
-    sql += " AND tags LIKE ? ESCAPE '\\'";
-    const tagVal = String(flags.tag ?? flags.t).replace(/[\\%_]/g, (c) => `\\${c}`);
-    params.push(`%${tagVal}%`);
+    sql += " AND EXISTS (SELECT 1 FROM json_each(tags) WHERE json_each.value = ?)";
+    params.push(String(flags.tag ?? flags.t));
   }
 
   sql += " ORDER BY priority ASC, updated_at DESC";
@@ -67,6 +71,18 @@ export function boardCommand(args: string[]): void {
 
   // 칸반 보드 렌더링
   renderBoard(columns, showAll);
+}
+
+function showBoardHelp(): void {
+  console.log(`
+Usage: tk board [options]
+
+Options:
+  --all           Show all projects
+  --status <s>    Filter by status (backlog, running, paused)
+  --tag, -t <tag> Filter by tag
+  -h, --help      Show help
+`);
 }
 
 function renderBoard(columns: Record<string, TicketRow[]>, showAll: boolean): void {
@@ -124,7 +140,7 @@ function renderBoard(columns: Record<string, TicketRow[]>, showAll: boolean): vo
   console.log(`  └${colNames.map(() => "─".repeat(colWidth)).join("┴")}┘\n`);
 }
 
-function findCurrentProjectName(db: import("bun:sqlite").Database): string | null {
+function findCurrentProjectName(db: Database): string | null {
   const path = detectProjectPath();
   const row = db.query("SELECT name FROM projects WHERE path = ?").get(path) as { name: string } | null;
   return row?.name ?? null;
