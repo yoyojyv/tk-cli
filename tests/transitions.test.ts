@@ -31,7 +31,7 @@ function atomicMove(id: string, fromStatus: string, toStatus: string): number {
 beforeEach(() => {
   dbPath = join(tmpdir(), `tk-transitions-${Date.now()}-${Math.random().toString(36).slice(2)}.db`);
   db = new Database(dbPath, { create: true });
-  db.exec("PRAGMA foreign_keys = ON");
+  db.run("PRAGMA foreign_keys = ON");
   migrate(db);
   db.query("INSERT INTO projects (name, key, path) VALUES ('test', 'TEST', '/tmp/test')").run();
 });

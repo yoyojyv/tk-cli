@@ -62,8 +62,8 @@ export function initDb(): Database {
   mkdirSync(dir, { recursive: true });
 
   const db = new Database(dbPath, { create: true });
-  db.exec("PRAGMA journal_mode = WAL");
-  db.exec("PRAGMA foreign_keys = ON");
+  db.run("PRAGMA journal_mode = WAL");
+  db.run("PRAGMA foreign_keys = ON");
 
   // 마이그레이션 실행
   migrate(db);
@@ -88,7 +88,7 @@ export function migrate(db: Database): void {
 
     db.transaction(() => {
       for (const sql of statements) {
-        db.exec(sql);
+        db.run(sql);
       }
       db.query("INSERT INTO schema_version (version) VALUES (?)").run(v);
     })();

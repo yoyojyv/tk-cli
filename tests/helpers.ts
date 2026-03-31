@@ -43,7 +43,7 @@ export function seedProject(home: string, name: string, key: string, path: strin
   const dbDir = join(home, ".config", "jerry-tickets");
   mkdirSync(dbDir, { recursive: true });
   const db = new Database(join(dbDir, "tickets.db"), { create: true });
-  db.exec("PRAGMA foreign_keys = ON");
+  db.run("PRAGMA foreign_keys = ON");
   migrate(db);
   db.query("INSERT INTO projects (name, key, path) VALUES (?, ?, ?)").run(name, key, path);
   db.close();

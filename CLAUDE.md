@@ -37,3 +37,5 @@ src/
 - 상태 전이: backlog→running→paused⇄running→done, backlog/paused→aborted
 - soft delete (status='deleted')
 - 프로젝트 감지: git root 기반
+- `db.exec()` 사용 금지 → `db.run()` 사용 (exec는 run의 deprecated alias)
+- PRAGMA 설정: `db.run("PRAGMA ...")` 패턴 사용

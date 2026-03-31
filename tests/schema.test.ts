@@ -11,7 +11,7 @@ let dbPath: string;
 beforeEach(() => {
   dbPath = join(tmpdir(), `tk-test-${Date.now()}-${Math.random().toString(36).slice(2)}.db`);
   db = new Database(dbPath, { create: true });
-  db.exec("PRAGMA foreign_keys = ON");
+  db.run("PRAGMA foreign_keys = ON");
 });
 
 afterEach(() => {
