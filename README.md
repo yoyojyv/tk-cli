@@ -44,15 +44,19 @@ tk board
 | `tk project list` | 등록된 프로젝트 목록과 티켓 통계를 출력한다 |
 | `tk project view` | 현재 프로젝트 상세 정보를 출력한다 |
 
+서브커맨드 별칭: `l`(list), `v`(view)
+
 ### `tk issue` (별칭: `i`)
 
 | 명령어 | 설명 |
 |--------|------|
 | `tk issue create <제목> [-p 우선순위] [-t 태그]` | 티켓을 생성한다 |
-| `tk issue list [--status S] [--priority P] [--all]` | 티켓 목록을 조회한다 |
+| `tk issue list [--status S] [-p P] [--project N] [--tag T] [--all] [--json]` | 티켓 목록을 조회한다 |
 | `tk issue view <티켓ID>` | 티켓 상세 정보를 출력한다 |
 | `tk issue move <티켓ID> <상태>` | 티켓 상태를 변경한다 |
 | `tk issue delete <티켓ID>` | 티켓을 삭제한다 (soft delete) |
+
+서브커맨드 별칭: `c`(create), `l`(list), `v`(view), `m`(move), `d`(delete)
 
 **우선순위**: 0 (긴급) ~ 3 (낮음), 기본값 2
 
@@ -61,8 +65,10 @@ tk board
 ### `tk board` (별칭: `b`)
 
 ```bash
-tk board          # 현재 프로젝트의 칸반 보드
-tk board --all    # 전체 프로젝트의 칸반 보드
+tk board                    # 현재 프로젝트의 칸반 보드
+tk board --all              # 전체 프로젝트의 칸반 보드
+tk board --status running   # 상태 필터
+tk board --tag bug          # 태그 필터 (정확 매칭)
 ```
 
 ## 상태 전이

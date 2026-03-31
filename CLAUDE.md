@@ -21,8 +21,10 @@ src/
     board.ts                   # tk board (칸반)
   db/
     schema.ts                  # SQLite 스키마 + 마이그레이션
+    types.ts                   # 타입 정의 (TicketRow, ProjectRow, 상태 전이 규칙)
   utils/
     parser.ts                  # CLI 인자 파서
+    project.ts                 # 프로젝트 감지 (git root 기반, 캐싱)
 ```
 
 ## DB
