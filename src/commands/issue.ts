@@ -1,18 +1,19 @@
-import { parseArgs } from "../utils/parser";
 import { initDb } from "../db/schema";
+import type { TicketRow } from "../db/types";
+import { parseArgs } from "../utils/parser";
+import { detectProject } from "../utils/project";
 
 const SUBCOMMAND_ALIASES: Record<string, string> = {
   c: "create",
   l: "list",
   v: "view",
   m: "move",
-  e: "edit",
   d: "delete",
 };
 
 export function issueCommand(args: string[]): void {
   if (args.length === 0) {
-    console.error('Usage: tk issue <create|list|view|move|delete> [options]');
+    console.error("Usage: tk issue <create|list|view|move|delete> [options]");
     process.exit(1);
   }
 
@@ -57,14 +58,33 @@ function issueCreate(args: string[]): void {
   }
 
   const priority = Number(flags.p ?? flags.priority ?? 2);
-  const tags = flags.t ?? flags.tag ?? "[]";
-  const tagsJson = typeof tags === "string" && !tags.startsWith("[")
-    ? JSON.stringify(tags.split(","))
-    : typeof tags === "string" ? tags : "[]";
+  if (!Number.isInteger(priority) || priority < 0 || priority > 3) {
+    console.error("Error: priority must be 0 (urgent), 1, 2 (default), or 3 (low).");
+    process.exit(1);
+  }
 
-  // 다음 티켓 번호 생성
-  const row = db.query("SELECT COUNT(*) as cnt FROM tickets WHERE project = ?").get(project.name) as { cnt: number };
-  const num = String(row.cnt + 1).padStart(3, "0");
+  const tags = flags.t ?? flags.tag ?? "[]";
+  let tagsJson: string;
+  if (typeof tags === "string" && !tags.startsWith("[")) {
+    tagsJson = JSON.stringify(tags.split(","));
+  } else if (typeof tags === "string") {
+    try {
+      JSON.parse(tags); // 유효성 검증
+      tagsJson = tags;
+    } catch {
+      console.error('Error: invalid JSON for tags. Use -t bug,urgent or -t \'["bug","urgent"]\'');
+      process.exit(1);
+    }
+  } else {
+    tagsJson = "[]";
+  }
+
+  // 다음 티켓 번호 생성 (MAX 기반 — hard delete에도 안전)
+  // 키 길이 + 하이픈(1) 이후의 숫자 부분을 추출 (키에 하이픈이 있어도 안전)
+  const row = db
+    .query("SELECT MAX(CAST(SUBSTR(id, LENGTH(?) + 2) AS INTEGER)) as max_num FROM tickets WHERE project = ?")
+    .get(project.key, project.name) as { max_num: number | null };
+  const num = String((row.max_num ?? 0) + 1).padStart(3, "0");
   const id = `${project.key}-${num}`;
 
   db.query(`
@@ -107,8 +127,9 @@ function issueList(args: string[]): void {
     }
   }
   if (flags.tag || flags.t) {
-    sql += " AND tags LIKE ?";
-    params.push(`%${String(flags.tag ?? flags.t)}%`);
+    sql += " AND tags LIKE ? ESCAPE '\\'";
+    const tagVal = String(flags.tag ?? flags.t).replace(/[\\%_]/g, (c) => `\\${c}`);
+    params.push(`%${tagVal}%`);
   }
 
   sql += " ORDER BY priority ASC, updated_at DESC";
@@ -129,7 +150,7 @@ function issueList(args: string[]): void {
   console.log(`\n  ${"ID".padEnd(12)} ${"Title".padEnd(30)} ${"Status".padEnd(10)} ${"P"}`);
   console.log(`  ${"─".repeat(12)} ${"─".repeat(30)} ${"─".repeat(10)} ${"─"}`);
   for (const row of rows) {
-    const title = row.title.length > 28 ? row.title.substring(0, 27) + "…" : row.title;
+    const title = row.title.length > 28 ? `${row.title.substring(0, 27)}…` : row.title;
     console.log(`  ${row.id.padEnd(12)} ${title.padEnd(30)} ${row.status.padEnd(10)} ${row.priority}`);
   }
   console.log();
@@ -201,12 +222,21 @@ function issueMove(args: string[]): void {
   const now = new Date().toISOString();
   const updates: Record<string, string> = { status: targetStatus, updated_at: now };
 
-  if (targetStatus === "running") updates.started_at = now;
+  if (targetStatus === "running" && !ticket.started_at) updates.started_at = now;
   if (targetStatus === "paused") updates.paused_at = now;
   if (targetStatus === "done" || targetStatus === "aborted") updates.completed_at = now;
 
-  const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(", ");
-  db.query(`UPDATE tickets SET ${setClauses} WHERE id = ?`).run(...Object.values(updates), id);
+  const setClauses = Object.keys(updates)
+    .map((k) => `${k} = ?`)
+    .join(", ");
+  const result = db
+    .query(`UPDATE tickets SET ${setClauses} WHERE id = ? AND status = ?`)
+    .run(...Object.values(updates), id, ticket.status);
+
+  if (result.changes === 0) {
+    console.error(`Error: ${id} status changed concurrently. Please retry.`);
+    process.exit(1);
+  }
 
   db.query(`
     INSERT INTO ticket_history (ticket_id, event_type, data)
@@ -239,46 +269,6 @@ function issueDelete(args: string[]): void {
 
 // Helpers
 
-interface TicketRow {
-  id: string;
-  project: string;
-  title: string;
-  description: string;
-  status: string;
-  priority: number;
-  tags: string;
-  pipeline: string | null;
-  estimated_hours: number | null;
-  started_at: string | null;
-  completed_at: string | null;
-  paused_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-interface ProjectRow {
-  name: string;
-  key: string;
-  path: string;
-  created_at: string;
-}
-
-function detectProject(db: import("bun:sqlite").Database): ProjectRow | null {
-  const cwd = process.cwd();
-  // git root 기반 감지
-  try {
-    const result = Bun.spawnSync(["git", "rev-parse", "--show-toplevel"], { cwd });
-    const gitRoot = result.stdout.toString().trim();
-    if (gitRoot) {
-      const row = db.query("SELECT * FROM projects WHERE path = ?").get(gitRoot) as ProjectRow | null;
-      if (row) return row;
-    }
-  } catch {
-    // git이 없으면 cwd로 fallback
-  }
-  return db.query("SELECT * FROM projects WHERE path = ?").get(cwd) as ProjectRow | null;
-}
-
 function statusBadge(status: string): string {
   const badges: Record<string, string> = {
     backlog: "[BACKLOG]",
@@ -286,6 +276,7 @@ function statusBadge(status: string): string {
     paused: "[PAUSED]",
     done: "[DONE]",
     aborted: "[ABORTED]",
+    deleted: "[DELETED]",
   };
   return badges[status] ?? `[${status.toUpperCase()}]`;
 }

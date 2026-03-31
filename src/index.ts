@@ -1,9 +1,8 @@
 #!/usr/bin/env bun
 
-import { parseArgs } from "./utils/parser";
+import { boardCommand } from "./commands/board";
 import { issueCommand } from "./commands/issue";
 import { projectCommand } from "./commands/project";
-import { boardCommand } from "./commands/board";
 
 const ALIASES: Record<string, string> = {
   i: "issue",

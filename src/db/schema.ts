@@ -1,8 +1,9 @@
 import { Database } from "bun:sqlite";
+import { mkdirSync } from "node:fs";
 
-const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 1;
 
-const MIGRATIONS: Record<number, string[]> = {
+export const MIGRATIONS: Record<number, string[]> = {
   1: [
     `CREATE TABLE IF NOT EXISTS schema_version (
       version INTEGER PRIMARY KEY,
@@ -58,7 +59,7 @@ export function initDb(): Database {
 
   // 디렉토리 생성
   const dir = dbPath.substring(0, dbPath.lastIndexOf("/"));
-  require("fs").mkdirSync(dir, { recursive: true });
+  mkdirSync(dir, { recursive: true });
 
   const db = new Database(dbPath, { create: true });
   db.exec("PRAGMA journal_mode = WAL");
@@ -70,11 +71,9 @@ export function initDb(): Database {
   return db;
 }
 
-function migrate(db: Database): void {
+export function migrate(db: Database): void {
   // schema_version 테이블이 없으면 첫 실행
-  const hasVersionTable = db
-    .query("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'")
-    .get();
+  const hasVersionTable = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'").get();
 
   let currentVersion = 0;
   if (hasVersionTable) {
@@ -91,7 +90,7 @@ function migrate(db: Database): void {
       for (const sql of statements) {
         db.exec(sql);
       }
-      db.exec(`INSERT INTO schema_version (version) VALUES (${v})`);
+      db.query("INSERT INTO schema_version (version) VALUES (?)").run(v);
     })();
   }
 }

@@ -1,9 +1,11 @@
-import { parseArgs } from "../utils/parser";
 import { initDb } from "../db/schema";
+import type { ProjectRow } from "../db/types";
+import { parseArgs } from "../utils/parser";
+import { detectProjectPath } from "../utils/project";
 
 export function projectCommand(args: string[]): void {
   if (args.length === 0) {
-    console.error('Usage: tk project <init|list|view> [options]');
+    console.error("Usage: tk project <init|list|view> [options]");
     process.exit(1);
   }
 
@@ -30,26 +32,21 @@ function projectInit(args: string[]): void {
   const { flags } = parseArgs(args);
   const db = initDb();
 
-  // git root 감지
-  let path = process.cwd();
-  let name = "";
-  try {
-    const result = Bun.spawnSync(["git", "rev-parse", "--show-toplevel"]);
-    const gitRoot = result.stdout.toString().trim();
-    if (gitRoot) {
-      path = gitRoot;
-      name = gitRoot.split("/").pop() || "unknown";
-    }
-  } catch {
-    name = path.split("/").pop() || "unknown";
-  }
-
-  const key = String(flags.key || name.toUpperCase().replace(/[^A-Z0-9]/g, "").substring(0, 6) || "TK");
+  const path = detectProjectPath();
+  const name = path.split("/").pop() || "unknown";
+  const key = String(
+    flags.key ||
+      name
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .substring(0, 6) ||
+      "TK",
+  );
 
   // 이미 등록된 프로젝트인지 확인
-  const existing = db.query("SELECT * FROM projects WHERE path = ?").get(path);
+  const existing = db.query("SELECT * FROM projects WHERE path = ?").get(path) as ProjectRow | null;
   if (existing) {
-    console.log(`Project already registered: ${name} (${key})`);
+    console.log(`Project already registered: ${existing.name} (${existing.key})`);
     return;
   }
 
@@ -60,14 +57,9 @@ function projectInit(args: string[]): void {
   console.log(`\nCreate your first ticket: tk issue create "My first task"`);
 }
 
-function projectList(args: string[]): void {
+function projectList(_args: string[]): void {
   const db = initDb();
-  const projects = db.query("SELECT * FROM projects ORDER BY name").all() as Array<{
-    name: string;
-    key: string;
-    path: string;
-    created_at: string;
-  }>;
+  const projects = db.query("SELECT * FROM projects ORDER BY name").all() as ProjectRow[];
 
   if (projects.length === 0) {
     console.log('No projects found. Run "tk project init" in a project directory.');
@@ -76,45 +68,37 @@ function projectList(args: string[]): void {
 
   console.log("\n  Projects:\n");
   for (const p of projects) {
-    const stats = db.query(`
+    const stats = db
+      .query(`
       SELECT status, COUNT(*) as cnt FROM tickets
       WHERE project = ? AND status != 'deleted'
       GROUP BY status
-    `).all(p.name) as Array<{ status: string; cnt: number }>;
+    `)
+      .all(p.name) as Array<{ status: string; cnt: number }>;
 
-    const summary = stats.map(s => `${s.cnt} ${s.status}`).join(", ") || "no tickets";
+    const summary = stats.map((s) => `${s.cnt} ${s.status}`).join(", ") || "no tickets";
     console.log(`  ${p.name.padEnd(25)} ${p.key.padEnd(8)} ${summary}`);
   }
   console.log();
 }
 
-function projectView(args: string[]): void {
+function projectView(_args: string[]): void {
   const db = initDb();
-
-  let path = process.cwd();
-  try {
-    const result = Bun.spawnSync(["git", "rev-parse", "--show-toplevel"]);
-    const gitRoot = result.stdout.toString().trim();
-    if (gitRoot) path = gitRoot;
-  } catch {}
-
-  const project = db.query("SELECT * FROM projects WHERE path = ?").get(path) as {
-    name: string;
-    key: string;
-    path: string;
-    created_at: string;
-  } | null;
+  const path = detectProjectPath();
+  const project = db.query("SELECT * FROM projects WHERE path = ?").get(path) as ProjectRow | null;
 
   if (!project) {
     console.error('Not a registered project. Run "tk project init" first.');
     process.exit(1);
   }
 
-  const stats = db.query(`
+  const stats = db
+    .query(`
     SELECT status, COUNT(*) as cnt FROM tickets
     WHERE project = ? AND status != 'deleted'
     GROUP BY status
-  `).all(project.name) as Array<{ status: string; cnt: number }>;
+  `)
+    .all(project.name) as Array<{ status: string; cnt: number }>;
 
   const total = stats.reduce((sum, s) => sum + s.cnt, 0);
 
@@ -124,6 +108,6 @@ function projectView(args: string[]): void {
   Path:    ${project.path}
   Created: ${project.created_at}
   Tickets: ${total}
-  ${stats.map(s => `  ${s.status}: ${s.cnt}`).join("\n")}
+  ${stats.map((s) => `  ${s.status}: ${s.cnt}`).join("\n")}
 `);
 }
