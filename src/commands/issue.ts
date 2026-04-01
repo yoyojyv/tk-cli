@@ -214,10 +214,10 @@ function issueList(args: string[], db: Database): void {
 }
 
 function issueView(args: string[], db: Database): void {
-  const { positional } = parseArgs(args);
+  const { positional, flags } = parseArgs(args);
   const id = positional[0];
   if (!id) {
-    console.error("Usage: tk issue view <ticket-id>");
+    console.error("Usage: tk issue view <ticket-id> [--json]");
     process.exit(1);
   }
 
@@ -225,6 +225,11 @@ function issueView(args: string[], db: Database): void {
   if (!ticket) {
     console.error(`Error: Ticket not found: ${id}`);
     process.exit(1);
+  }
+
+  if (flags.json) {
+    console.log(JSON.stringify(ticket, null, 2));
+    return;
   }
 
   console.log(`
@@ -248,7 +253,7 @@ function issueMove(args: string[], db: Database): void {
   const [id, targetStatus] = positional;
   if (!id || !targetStatus) {
     console.error("Usage: tk issue move <ticket-id> <status>");
-    console.error("Statuses: backlog, running, paused, done, aborted");
+    console.error("Statuses: backlog, in_progress, paused, done, aborted");
     process.exit(1);
   }
 
@@ -419,7 +424,7 @@ function issueDelete(args: string[], db: Database): void {
 function statusBadge(status: string): string {
   const badges: Record<string, string> = {
     backlog: "[BACKLOG]",
-    running: "[IN_PROGRESS]",
+    in_progress: "[IN_PROGRESS]",
     paused: "[PAUSED]",
     done: "[DONE]",
     aborted: "[ABORTED]",
