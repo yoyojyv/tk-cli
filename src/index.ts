@@ -29,15 +29,17 @@ Options:
 
 Board Options:
   --all           Show all projects
+  --by stage      Group by stage instead of status
   --status <s>    Filter by status
   --tag, -t <tag> Filter by tag
 
 Examples:
-  tk issue create "Add search autocomplete"
-  tk issue list --status running
+  tk issue create "Add search autocomplete" --stage spec
+  tk issue update APP-001 --stage dev --step coding
+  tk issue list --status in_progress
   tk issue move APP-001 done
   tk board
-  tk board --all
+  tk board --by stage
   tk project list
 `);
 }

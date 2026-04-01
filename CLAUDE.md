@@ -16,7 +16,7 @@ bun test                       # 테스트
 src/
   index.ts                     # CLI 엔트리포인트 + 라우터
   commands/
-    issue.ts                   # tk issue create/list/view/move/delete
+    issue.ts                   # tk issue create/list/view/move/update/delete
     project.ts                 # tk project init/list/view
     board.ts                   # tk board (칸반)
   db/
@@ -36,7 +36,7 @@ src/
 ## 규칙
 
 - TypeScript strict mode (tsconfig.json)
-- 상태 전이: backlog→running→paused⇄running→done, backlog/paused→aborted
+- 상태 전이: backlog→in_progress→paused⇄in_progress→done, backlog/paused→aborted
 - soft delete (status='deleted')
 - 프로젝트 감지: git root 기반
 - `db.exec()` 사용 금지 → `db.run()` 사용 (exec는 run의 deprecated alias)

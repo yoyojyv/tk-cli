@@ -164,10 +164,10 @@ describe("issue list", () => {
   });
 
   it("--status로 필터링한다", () => {
-    run(["issue", "move", "TEST-0001", "running"], env);
+    run(["issue", "move", "TEST-0001", "in_progress"], env);
 
     const { stdout, exitCode } = run(
-      ["issue", "list", "--status", "running", "--all"],
+      ["issue", "list", "--status", "in_progress", "--all"],
       env
     );
     expect(exitCode).toBe(0);
@@ -283,17 +283,17 @@ describe("issue move", () => {
     run(["issue", "create", "Move test ticket"], env);
   });
 
-  it("backlog → running 전이에 성공한다", () => {
+  it("backlog → in_progress 전이에 성공한다", () => {
     const { stdout, exitCode } = run(
-      ["issue", "move", "TEST-0001", "running"],
+      ["issue", "move", "TEST-0001", "in_progress"],
       env
     );
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("backlog → running");
+    expect(stdout).toContain("backlog → in_progress");
   });
 
-  it("started_at이 최초 running 전환 시 기록된다", () => {
-    run(["issue", "move", "TEST-0001", "running"], env);
+  it("started_at이 최초 in_progress 전환 시 기록된다", () => {
+    run(["issue", "move", "TEST-0001", "in_progress"], env);
 
     const db = openTestDb(home);
     const row = db
@@ -304,8 +304,8 @@ describe("issue move", () => {
     expect(row?.started_at).toBeTruthy();
   });
 
-  it("running → paused → running 시 started_at이 보존된다", () => {
-    run(["issue", "move", "TEST-0001", "running"], env);
+  it("in_progress → paused → in_progress 시 started_at이 보존된다", () => {
+    run(["issue", "move", "TEST-0001", "in_progress"], env);
 
     const db1 = openTestDb(home);
     const first = db1
@@ -316,7 +316,7 @@ describe("issue move", () => {
     const originalStartedAt = first?.started_at;
 
     run(["issue", "move", "TEST-0001", "paused"], env);
-    run(["issue", "move", "TEST-0001", "running"], env);
+    run(["issue", "move", "TEST-0001", "in_progress"], env);
 
     const db2 = openTestDb(home);
     const after = db2
@@ -337,7 +337,7 @@ describe("issue move", () => {
   });
 
   it("terminal 상태(done)에서 전이를 거부한다", () => {
-    run(["issue", "move", "TEST-0001", "running"], env);
+    run(["issue", "move", "TEST-0001", "in_progress"], env);
     run(["issue", "move", "TEST-0001", "done"], env);
 
     const { stderr, exitCode } = run(
@@ -349,7 +349,7 @@ describe("issue move", () => {
   });
 
   it("완료 시 completed_at이 기록된다", () => {
-    run(["issue", "move", "TEST-0001", "running"], env);
+    run(["issue", "move", "TEST-0001", "in_progress"], env);
     run(["issue", "move", "TEST-0001", "done"], env);
 
     const db = openTestDb(home);
@@ -372,7 +372,7 @@ describe("issue move", () => {
 
   it("존재하지 않는 티켓은 에러를 반환한다", () => {
     const { stderr, exitCode } = run(
-      ["issue", "move", "NONE-999", "running"],
+      ["issue", "move", "NONE-999", "in_progress"],
       env
     );
     expect(exitCode).toBe(1);
@@ -380,7 +380,7 @@ describe("issue move", () => {
   });
 
   it("히스토리에 전이 이벤트가 기록된다", () => {
-    run(["issue", "move", "TEST-0001", "running"], env);
+    run(["issue", "move", "TEST-0001", "in_progress"], env);
 
     const db = openTestDb(home);
     const rows = db
@@ -392,7 +392,7 @@ describe("issue move", () => {
 
     const eventTypes = rows.map((r) => r.event_type);
     expect(eventTypes).toContain("created");
-    expect(eventTypes).toContain("running");
+    expect(eventTypes).toContain("in_progress");
   });
 });
 

@@ -6,6 +6,8 @@ export interface TicketRow {
   status: string;
   priority: number;
   tags: string;
+  stage: string | null;
+  step: string | null;
   pipeline: string | null;
   estimated_hours: number | null;
   started_at: string | null;
@@ -23,9 +25,9 @@ export interface ProjectRow {
 }
 
 export const VALID_TRANSITIONS: Record<string, string[]> = {
-  backlog: ["running", "aborted"],
-  running: ["paused", "done"],
-  paused: ["running", "aborted"],
+  backlog: ["in_progress", "aborted"],
+  in_progress: ["paused", "done"],
+  paused: ["in_progress", "aborted"],
   // done, aborted = terminal states
 };
 

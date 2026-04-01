@@ -23,6 +23,8 @@ export const MIGRATIONS: Record<number, string[]> = {
       status TEXT NOT NULL DEFAULT 'backlog',
       priority INTEGER NOT NULL DEFAULT 2,
       tags TEXT DEFAULT '[]',
+      stage TEXT,
+      step TEXT,
       pipeline TEXT,
       estimated_hours REAL,
       started_at TEXT,
@@ -31,7 +33,7 @@ export const MIGRATIONS: Record<number, string[]> = {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (project) REFERENCES projects(name),
-      CHECK (status IN ('backlog', 'running', 'paused', 'done', 'aborted', 'deleted')),
+      CHECK (status IN ('backlog', 'in_progress', 'paused', 'done', 'aborted', 'deleted')),
       CHECK (priority BETWEEN 0 AND 3)
     )`,
     `CREATE TABLE IF NOT EXISTS ticket_history (
@@ -46,6 +48,7 @@ export const MIGRATIONS: Record<number, string[]> = {
     `CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)`,
     `CREATE INDEX IF NOT EXISTS idx_tickets_priority ON tickets(priority)`,
     `CREATE INDEX IF NOT EXISTS idx_history_ticket ON ticket_history(ticket_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_tickets_stage ON tickets(stage)`,
   ],
 };
 

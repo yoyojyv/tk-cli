@@ -38,6 +38,25 @@ export function boardCommand(args: string[], db: Database): void {
   sql += " ORDER BY priority ASC, updated_at DESC";
   const tickets = db.query(sql).all(...params) as TicketRow[];
 
+  const byStage = flags.by === "stage";
+
+  if (byStage) {
+    // stage 기준 동적 칸반
+    // done/aborted 제외된 tickets만 사용 (이미 필터됨)
+    const stageColumns: Record<string, TicketRow[]> = {};
+    for (const t of tickets) {
+      const col = t.stage || "(no stage)";
+      if (!stageColumns[col]) stageColumns[col] = [];
+      stageColumns[col]!.push(t);
+    }
+
+    const projectName = showAll ? "All Projects" : currentProject || "Unknown";
+    console.log(`\n  ${projectName}${" ".repeat(Math.max(1, 45 - projectName.length))}${tickets.length} tickets\n`);
+
+    renderBoard(stageColumns, showAll, true);
+    return;
+  }
+
   // 완료/중단 티켓도 보여주기 (최근 5개)
   let doneSql = "SELECT * FROM tickets WHERE status IN ('done', 'aborted')";
   const doneParams: string[] = [];
@@ -51,7 +70,7 @@ export function boardCommand(args: string[], db: Database): void {
   // 상태별 분류
   const columns: Record<string, TicketRow[]> = {
     BACKLOG: [],
-    RUNNING: [],
+    IN_PROGRESS: [],
     PAUSED: [],
     "DONE/ABT": [],
   };
@@ -79,15 +98,21 @@ Usage: tk board [options]
 
 Options:
   --all           Show all projects
-  --status <s>    Filter by status (backlog, running, paused)
+  --by stage      Group by stage instead of status
+  --status <s>    Filter by status (backlog, in_progress, paused)
   --tag, -t <tag> Filter by tag
   -h, --help      Show help
 `);
 }
 
-function renderBoard(columns: Record<string, TicketRow[]>, showAll: boolean): void {
+function renderBoard(columns: Record<string, TicketRow[]>, showAll: boolean, byStage = false): void {
   const colWidth = 16;
-  const colNames = ["BACKLOG", "RUNNING", "PAUSED", "DONE/ABT"];
+  const colNames = byStage ? Object.keys(columns) : ["BACKLOG", "IN_PROGRESS", "PAUSED", "DONE/ABT"];
+
+  if (colNames.length === 0) {
+    console.log("  No tickets to display.\n");
+    return;
+  }
 
   // 헤더
   const header = colNames.map((n) => ` ${n.padEnd(colWidth - 1)}`).join("│");
@@ -121,8 +146,8 @@ function renderBoard(columns: Record<string, TicketRow[]>, showAll: boolean): vo
       .map((col) => {
         const ticket = columns[col]?.[row];
         if (!ticket) return " ".repeat(colWidth);
-        let meta = `P${ticket.priority}`;
-        if (ticket.status === "aborted") meta += " ABT";
+        let meta = byStage && ticket.step ? ticket.step : `P${ticket.priority}`;
+        if (!byStage && ticket.status === "aborted") meta += " ABT";
         if (showAll) meta += ` ${ticket.project.substring(0, 8)}`;
         return ` ${meta.padEnd(colWidth - 1)}`;
       })

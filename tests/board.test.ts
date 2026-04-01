@@ -10,14 +10,14 @@ describe("board", () => {
     seedProject(home, "test", "TEST", REAL_TMPDIR);
     run(["issue", "create", "Task A"], env);
     run(["issue", "create", "Task B"], env);
-    run(["issue", "move", "TEST-0001", "running"], env);
+    run(["issue", "move", "TEST-0001", "in_progress"], env);
   });
 
   it("--all로 칸반 보드를 렌더링한다", () => {
     const { stdout, exitCode } = run(["board", "--all"], env);
     expect(exitCode).toBe(0);
     expect(stdout).toContain("BACKLOG");
-    expect(stdout).toContain("RUNNING");
+    expect(stdout).toContain("IN_PROGRESS");
     expect(stdout).toContain("PAUSED");
     expect(stdout).toContain("DONE/ABT");
     expect(stdout).toContain("TEST-0001");

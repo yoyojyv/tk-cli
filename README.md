@@ -28,7 +28,7 @@ tk project init
 tk issue create "검색 자동완성 추가"
 
 # 3. 상태 변경
-tk issue move APP-001 running
+tk issue move APP-001 in_progress
 
 # 4. 칸반 보드 확인
 tk board
@@ -50,31 +50,45 @@ tk board
 
 | 명령어 | 설명 |
 |--------|------|
-| `tk issue create <제목> [-p 우선순위] [-t 태그]` | 티켓을 생성한다 |
-| `tk issue list [--status S] [-p P] [--project N] [--tag T] [--all] [--json]` | 티켓 목록을 조회한다 |
+| `tk issue create <제목> [-p 우선순위] [-t 태그] [--stage S] [--step S]` | 티켓을 생성한다 |
+| `tk issue list [--status S] [-p P] [--project N] [--tag T] [--stage S] [--step S] [--all] [--json]` | 티켓 목록을 조회한다 |
 | `tk issue view <티켓ID>` | 티켓 상세 정보를 출력한다 |
 | `tk issue move <티켓ID> <상태>` | 티켓 상태를 변경한다 |
+| `tk issue update <티켓ID> [--stage S] [--step S] [--title T] [-p P]` | 티켓 필드를 수정한다 |
 | `tk issue delete <티켓ID>` | 티켓을 삭제한다 (soft delete) |
 
-서브커맨드 별칭: `c`(create), `l`(list), `v`(view), `m`(move), `d`(delete)
+서브커맨드 별칭: `c`(create), `l`(list), `v`(view), `m`(move), `u`(update), `d`(delete)
 
 **우선순위**: 0 (긴급) ~ 3 (낮음), 기본값 2
 
 **태그**: `-t bug,urgent` 또는 `-t '["bug","urgent"]'`
 
+**Stage/Step**: 워크플로우 단계를 나타내는 자유 텍스트 필드. tk는 값의 의미를 제한하지 않으므로 SDLC, 버그추적, 글쓰기 등 어떤 워크플로우에든 사용 가능하다.
+
+```bash
+# 예시: SDLC 워크플로우
+tk issue create "검색 API" --stage research --step gathering
+tk issue update APP-0001 --stage spec --step drafting
+tk issue update APP-0001 --stage dev --step coding
+
+# 예시: 빈 문자열로 stage/step 초기화
+tk issue update APP-0001 --stage ""
+```
+
 ### `tk board` (별칭: `b`)
 
 ```bash
-tk board                    # 현재 프로젝트의 칸반 보드
+tk board                    # 현재 프로젝트의 칸반 보드 (status 기준)
+tk board --by stage         # stage 기준 동적 칸반 보드
 tk board --all              # 전체 프로젝트의 칸반 보드
-tk board --status running   # 상태 필터
+tk board --status in_progress   # 상태 필터
 tk board --tag bug          # 태그 필터 (정확 매칭)
 ```
 
 ## 상태 전이
 
 ```
-backlog → running → paused ⇄ running → done
+backlog → in_progress → paused ⇄ in_progress → done
 backlog → aborted
 paused  → aborted
 ```

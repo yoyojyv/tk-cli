@@ -15,13 +15,13 @@ describe("parseArgs", () => {
   });
 
   it("--flag value 형식을 파싱한다", () => {
-    const result = parseArgs(["--status", "running"]);
-    expect(result.flags.status).toBe("running");
+    const result = parseArgs(["--status", "in_progress"]);
+    expect(result.flags.status).toBe("in_progress");
   });
 
   it("--flag=value 형식을 파싱한다", () => {
-    const result = parseArgs(["--status=running"]);
-    expect(result.flags.status).toBe("running");
+    const result = parseArgs(["--status=in_progress"]);
+    expect(result.flags.status).toBe("in_progress");
   });
 
   it("불리언 플래그를 파싱한다", () => {

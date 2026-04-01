@@ -86,7 +86,7 @@ describe("보드 명령어", () => {
     const { stdout, exitCode } = run(["board", "--all"]);
     expect(exitCode).toBe(0);
     expect(stdout).toContain("BACKLOG");
-    expect(stdout).toContain("RUNNING");
+    expect(stdout).toContain("IN_PROGRESS");
     expect(stdout).toContain("DONE");
   });
 

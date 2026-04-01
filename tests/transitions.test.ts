@@ -11,7 +11,7 @@ import { VALID_TRANSITIONS } from "../src/db/types";
  * VALID_TRANSITIONS 맵에 정의된 규칙을 DB 레벨에서 검증한다.
  */
 
-const ALL_STATUSES = ["backlog", "running", "paused", "done", "aborted"];
+const ALL_STATUSES = ["backlog", "in_progress", "paused", "done", "aborted"];
 
 let db: Database;
 let dbPath: string;
@@ -46,7 +46,7 @@ afterEach(() => {
 describe("상태 전이 규칙", () => {
   it("backlog → running이 허용된다", () => {
     setupTicket("T-001", "backlog");
-    expect(atomicMove("T-001", "backlog", "running")).toBe(1);
+    expect(atomicMove("T-001", "backlog", "in_progress")).toBe(1);
   });
 
   it("backlog → aborted가 허용된다", () => {
@@ -55,18 +55,18 @@ describe("상태 전이 규칙", () => {
   });
 
   it("running → paused가 허용된다", () => {
-    setupTicket("T-003", "running");
-    expect(atomicMove("T-003", "running", "paused")).toBe(1);
+    setupTicket("T-003", "in_progress");
+    expect(atomicMove("T-003", "in_progress", "paused")).toBe(1);
   });
 
   it("running → done이 허용된다", () => {
-    setupTicket("T-004", "running");
-    expect(atomicMove("T-004", "running", "done")).toBe(1);
+    setupTicket("T-004", "in_progress");
+    expect(atomicMove("T-004", "in_progress", "done")).toBe(1);
   });
 
   it("paused → running이 허용된다", () => {
     setupTicket("T-005", "paused");
-    expect(atomicMove("T-005", "paused", "running")).toBe(1);
+    expect(atomicMove("T-005", "paused", "in_progress")).toBe(1);
   });
 
   it("paused → aborted가 허용된다", () => {
@@ -102,7 +102,7 @@ describe("허용되지 않은 전이", () => {
   });
 
   it("running → backlog 역방향 전이는 불가하다", () => {
-    const allowed = VALID_TRANSITIONS.running!;
+    const allowed = VALID_TRANSITIONS.in_progress!;
     expect(allowed).not.toContain("backlog");
   });
 });
@@ -112,15 +112,15 @@ describe("atomic UPDATE (race condition 방어)", () => {
     setupTicket("RACE-001", "backlog");
 
     // 첫 번째 이동: backlog → running (성공)
-    const first = atomicMove("RACE-001", "backlog", "running");
+    const first = atomicMove("RACE-001", "backlog", "in_progress");
     expect(first).toBe(1);
 
     // 두 번째 이동: 여전히 backlog에서 시도 → 이미 running이므로 실패
-    const second = atomicMove("RACE-001", "backlog", "running");
+    const second = atomicMove("RACE-001", "backlog", "in_progress");
     expect(second).toBe(0);
 
     // 최종 상태 확인
     const row = db.query("SELECT status FROM tickets WHERE id = 'RACE-001'").get() as { status: string };
-    expect(row.status).toBe("running");
+    expect(row.status).toBe("in_progress");
   });
 });
