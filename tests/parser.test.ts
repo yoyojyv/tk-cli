@@ -57,4 +57,22 @@ describe("parseArgs", () => {
     expect(result.flags.all).toBe(true);
     expect(result.flags.p).toBe("2");
   });
+
+  it("booleanFlags로 지정된 플래그는 다음 인자를 소비하지 않는다", () => {
+    const result = parseArgs(["--json", "APP-001"], { booleanFlags: ["json"] });
+    expect(result.flags.json).toBe(true);
+    expect(result.positional).toEqual(["APP-001"]);
+  });
+
+  it("booleanFlags 미지정 시 기존 동작과 동일하다", () => {
+    const result = parseArgs(["--json", "APP-001"]);
+    expect(result.flags.json).toBe("APP-001");
+    expect(result.positional).toEqual([]);
+  });
+
+  it("짧은 플래그도 booleanFlags가 적용된다", () => {
+    const result = parseArgs(["-j", "APP-001"], { booleanFlags: ["j"] });
+    expect(result.flags.j).toBe(true);
+    expect(result.positional).toEqual(["APP-001"]);
+  });
 });

@@ -214,7 +214,7 @@ function issueList(args: string[], db: Database): void {
 }
 
 function issueView(args: string[], db: Database): void {
-  const { positional, flags } = parseArgs(args);
+  const { positional, flags } = parseArgs(args, { booleanFlags: ["json"] });
   const id = positional[0];
   if (!id) {
     console.error("Usage: tk issue view <ticket-id> [--json]");

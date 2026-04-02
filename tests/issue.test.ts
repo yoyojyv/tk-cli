@@ -268,6 +268,20 @@ describe("issue view", () => {
     expect(exitCode).toBe(1);
     expect(stderr).toContain("Usage");
   });
+
+  it("--json을 티켓 ID 앞에 놓아도 정상 동작한다", () => {
+    const { stdout, exitCode } = run(["issue", "view", "--json", "TEST-0001"], env);
+    expect(exitCode).toBe(0);
+    const parsed = JSON.parse(stdout);
+    expect(parsed.id).toBe("TEST-0001");
+  });
+
+  it("--json을 티켓 ID 뒤에 놓아도 정상 동작한다", () => {
+    const { stdout, exitCode } = run(["issue", "view", "TEST-0001", "--json"], env);
+    expect(exitCode).toBe(0);
+    const parsed = JSON.parse(stdout);
+    expect(parsed.id).toBe("TEST-0001");
+  });
 });
 
 // ────────────────────────────────────────────────────────────

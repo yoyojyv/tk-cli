@@ -7,9 +7,15 @@ export interface ParsedArgs {
   flags: Record<string, string | boolean>;
 }
 
-export function parseArgs(args: string[]): ParsedArgs {
+export interface ParseArgsOptions {
+  /** 항상 boolean으로 처리할 플래그 이름 목록 (예: ["json", "verbose"]) */
+  booleanFlags?: string[];
+}
+
+export function parseArgs(args: string[], options?: ParseArgsOptions): ParsedArgs {
   const positional: string[] = [];
   const flags: Record<string, string | boolean> = {};
+  const boolSet = new Set(options?.booleanFlags);
 
   let i = 0;
   while (i < args.length) {
@@ -21,23 +27,25 @@ export function parseArgs(args: string[]): ParsedArgs {
         // --flag=value
         flags[arg.substring(2, eqIdx)] = arg.substring(eqIdx + 1);
       } else {
+        const name = arg.substring(2);
         const next = args[i + 1];
-        if (next && !next.startsWith("-")) {
+        if (!boolSet.has(name) && next && !next.startsWith("-")) {
           // --flag value
-          flags[arg.substring(2)] = next;
+          flags[name] = next;
           i++;
         } else {
           // --flag (boolean)
-          flags[arg.substring(2)] = true;
+          flags[name] = true;
         }
       }
     } else if (arg.startsWith("-") && arg.length === 2) {
+      const name = arg.substring(1);
       const next = args[i + 1];
-      if (next && !next.startsWith("-")) {
-        flags[arg.substring(1)] = next;
+      if (!boolSet.has(name) && next && !next.startsWith("-")) {
+        flags[name] = next;
         i++;
       } else {
-        flags[arg.substring(1)] = true;
+        flags[name] = true;
       }
     } else {
       positional.push(arg);
